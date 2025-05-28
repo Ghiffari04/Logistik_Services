@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  room_availability_service:
+    build:
+      context: .
+      dockerfile: room_availability_service/Dockerfile
+    container_name: logistik_room_availability
+    ports:
+      - "5001:5001"
+    volumes:
+      - room_availability_data:/app
+    working_dir: /app
+    stop_signal: SIGINT
+    restart: unless-stopped
+
+  room_recommendation_service:
+    build:
+      context: .
+      dockerfile: room_recommendation_service/Dockerfile
+    container_name: logistik_room_recommendation
+    ports:
+      - "5002:5002"
+    volumes:
+      - room_recommendation_data:/app
+    working_dir: /app
+    environment:
+      ROOM_AVAILABILITY_SERVICE_URL: http://room_availability_service:5001
+    depends_on:
+      - room_availability_service
+    stop_signal: SIGINT
+    restart: unless-stopped
+
+  room_booking_service:
+    build:
+      context: .
+      dockerfile: room_booking_service/Dockerfile
+    container_name: logistik_room_booking
+    ports:
+      - "5003:5003"
+    volumes:
+      - room_booking_data:/app
+    working_dir: /app
+    environment:
+      ROOM_AVAILABILITY_SERVICE_URL: http://room_availability_service:5001
+    depends_on:
+      - room_availability_service
+    stop_signal: SIGINT
+    restart: unless-stopped
+
+  booking_confirmation_service:
+    build:
+      context: .
+      dockerfile: booking_confirmation_service/Dockerfile
+    container_name: logistik_booking_confirmation
+    ports:
+      - "5004:5004"
+    volumes:
+      - booking_confirmation_data:/app
+    working_dir: /app
+    environment:
+      ROOM_BOOKING_SERVICE_URL: http://room_booking_service:5003
+      ROOM_SCHEDULE_SERVICE_URL: http://room_schedule_service:5005
+    depends_on:
+      - room_booking_service
+      - room_schedule_service
+    stop_signal: SIGINT
+    restart: unless-stopped
+
+  room_schedule_service:
+    build:
+      context: .
+      dockerfile: room_schedule_service/Dockerfile
+    container_name: logistik_room_schedule
+    ports:
+      - "5005:5005"
+    volumes:
+      - room_schedule_data:/app
+    working_dir: /app
+    stop_signal: SIGINT
+    restart: unless-stopped
+
+volumes:
+  room_availability_data:
+  room_recommendation_data:
+  room_booking_data:
+  booking_confirmation_data:
+  room_schedule_data:
