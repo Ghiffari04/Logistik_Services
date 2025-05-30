@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import requests
 from datetime import datetime
 import os
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS with default config
 
 ROOM_AVAILABILITY_SERVICE = "http://room_availability_service:5001"
 

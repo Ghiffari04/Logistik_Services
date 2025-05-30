@@ -1,10 +1,12 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 import requests
 from datetime import datetime
 import os
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS with default config
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///room_booking.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)

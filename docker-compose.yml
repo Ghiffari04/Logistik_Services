@@ -1,6 +1,30 @@
 version: '3.8'
 
 services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: logistik_frontend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./frontend:/app
+    environment:
+      ROOM_AVAILABILITY_SERVICE_URL: http://room_availability_service:5001
+      ROOM_RECOMMENDATION_SERVICE_URL: http://room_recommendation_service:5002
+      ROOM_BOOKING_SERVICE_URL: http://room_booking_service:5003
+      BOOKING_CONFIRMATION_SERVICE_URL: http://booking_confirmation_service:5004
+      ROOM_SCHEDULE_SERVICE_URL: http://room_schedule_service:5005
+    depends_on:
+      - room_availability_service
+      - room_recommendation_service
+      - room_booking_service
+      - booking_confirmation_service
+      - room_schedule_service
+    stop_signal: SIGINT
+    restart: unless-stopped
+
   room_availability_service:
     build:
       context: .
