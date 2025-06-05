@@ -1,112 +1,108 @@
-version: '3.8'
-
 services:
-  frontend:
+  frontend_spacelog_telu:
     build:
-      context: ./frontend
+      context: ./SpaceLog_Tel-U/frontend
       dockerfile: Dockerfile
-    container_name: logistik_frontend
+    container_name: spacelog_telu_frontend
     ports:
       - "5000:5000"
-    volumes:
-      - ./frontend:/app
     environment:
       ROOM_AVAILABILITY_SERVICE_URL: http://room_availability_service:5001
       ROOM_RECOMMENDATION_SERVICE_URL: http://room_recommendation_service:5002
       ROOM_BOOKING_SERVICE_URL: http://room_booking_service:5003
       BOOKING_CONFIRMATION_SERVICE_URL: http://booking_confirmation_service:5004
       ROOM_SCHEDULE_SERVICE_URL: http://room_schedule_service:5005
+      ADD_EVENT_SERVICE_URL: http://add_event_service:5007
     depends_on:
       - room_availability_service
       - room_recommendation_service
       - room_booking_service
       - booking_confirmation_service
       - room_schedule_service
-    stop_signal: SIGINT
+      - add_event_service
     restart: unless-stopped
 
   room_availability_service:
     build:
-      context: .
-      dockerfile: room_availability_service/Dockerfile
-    container_name: logistik_room_availability
+      context: ./SpaceLog_Tel-U/room_availability_service
+      dockerfile: Dockerfile
+    container_name: room_availability_service
     ports:
       - "5001:5001"
-    volumes:
-      - room_availability_data:/app
-    working_dir: /app
-    stop_signal: SIGINT
     restart: unless-stopped
 
   room_recommendation_service:
     build:
-      context: .
-      dockerfile: room_recommendation_service/Dockerfile
-    container_name: logistik_room_recommendation
+      context: ./SpaceLog_Tel-U/room_recommendation_service
+      dockerfile: Dockerfile
+    container_name: room_recommendation_service
     ports:
       - "5002:5002"
-    volumes:
-      - room_recommendation_data:/app
-    working_dir: /app
     environment:
       ROOM_AVAILABILITY_SERVICE_URL: http://room_availability_service:5001
     depends_on:
       - room_availability_service
-    stop_signal: SIGINT
     restart: unless-stopped
 
   room_booking_service:
     build:
-      context: .
-      dockerfile: room_booking_service/Dockerfile
-    container_name: logistik_room_booking
+      context: ./SpaceLog_Tel-U/room_booking_service
+      dockerfile: Dockerfile
+    container_name: room_booking_service
     ports:
       - "5003:5003"
-    volumes:
-      - room_booking_data:/app
-    working_dir: /app
     environment:
       ROOM_AVAILABILITY_SERVICE_URL: http://room_availability_service:5001
     depends_on:
       - room_availability_service
-    stop_signal: SIGINT
     restart: unless-stopped
 
   booking_confirmation_service:
     build:
-      context: .
-      dockerfile: booking_confirmation_service/Dockerfile
-    container_name: logistik_booking_confirmation
+      context: ./SpaceLog_Tel-U/booking_confirmation_service
+      dockerfile: Dockerfile
+    container_name: booking_confirmation_service
     ports:
       - "5004:5004"
-    volumes:
-      - booking_confirmation_data:/app
-    working_dir: /app
     environment:
       ROOM_BOOKING_SERVICE_URL: http://room_booking_service:5003
       ROOM_SCHEDULE_SERVICE_URL: http://room_schedule_service:5005
     depends_on:
       - room_booking_service
       - room_schedule_service
-    stop_signal: SIGINT
     restart: unless-stopped
 
   room_schedule_service:
     build:
-      context: .
-      dockerfile: room_schedule_service/Dockerfile
-    container_name: logistik_room_schedule
+      context: ./SpaceLog_Tel-U/room_schedule_service
+      dockerfile: Dockerfile
+    container_name: room_schedule_service
     ports:
       - "5005:5005"
-    volumes:
-      - room_schedule_data:/app
-    working_dir: /app
-    stop_signal: SIGINT
     restart: unless-stopped
 
-volumes:
-  room_availability_data:
-  room_recommendation_data:
-  room_booking_data:
-  booking_confirmation_data:
-  room_schedule_data:
+  frontend_kemahasiswaan:
+    build:
+      context: ./Kemahasiswaan/frontend
+      dockerfile: Dockerfile
+    container_name: kemahasiswaan_frontend
+    ports:
+      - "5006:5006"
+    environment:
+      ADD_EVENT_SERVICE_URL: http://add_event_service:5007
+    depends_on:
+      - add_event_service
+    restart: unless-stopped
+
+  add_event_service:
+    build:
+      context: ./Kemahasiswaan/add_event_service
+      dockerfile: Dockerfile
+    container_name: add_event_service
+    ports:
+      - "5007:5007"
+    restart: unless-stopped
+
+networks:
+  default:
+    driver: bridge
