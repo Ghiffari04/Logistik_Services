@@ -1,17 +1,32 @@
-from flask import Flask, request, jsonify
+# ====================
+# Import Libraries
+# ====================
+from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from datetime import datetime
 import graphene
 from graphene import ObjectType, String, Int, Field, Mutation
 
+# ====================
+# App Initialization
+# ====================
 app = Flask(__name__)
-CORS(app)
+CORS(app) # Mengaktifkan CORS agar bisa diakses dari frontend/backend lain
+
+# ====================
+# Service Endpoint Config
+# ====================
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///room_availability.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# ====================
+# Database Initialization
+# ====================
 db = SQLAlchemy(app)
 
-# Models
+# ====================
+# Model
+# ====================
 class Room(db.Model):
     room_id = db.Column(db.Integer, primary_key=True)
     nama_ruangan = db.Column(db.String(255), nullable=False)
@@ -19,17 +34,15 @@ class Room(db.Model):
     fasilitas = db.Column(db.String(1000))
     lokasi = db.Column(db.String(255))
 
-class RoomSchedule(db.Model):
-    schedule_id = db.Column(db.Integer, primary_key=True)
-    room_id = db.Column(db.Integer, db.ForeignKey('room.room_id'), nullable=False)
-    tanggal_mulai = db.Column(db.DateTime, nullable=False)
-    tanggal_selesai = db.Column(db.DateTime, nullable=False)
-    status = db.Column(db.String(255))
-    event_id = db.Column(db.Integer)
-
+# ====================
+# Create DB
+# ====================
 with app.app_context():
     db.create_all()
 
+# ====================
+# REST Endpoints
+# ====================
 @app.route('/rooms', methods=['GET'])
 def get_rooms():
     rooms = Room.query.all()
@@ -41,48 +54,64 @@ def get_rooms():
         'lokasi': room.lokasi
     } for room in rooms])
 
-@app.route('/check-availability', methods=['GET'])
-def check_availability():
-    room_id = request.args.get('room_id')
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    
-    if not all([room_id, start_date, end_date]):
-        return jsonify({'error': 'Missing parameters'}), 400
-    
-    try:
-        start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
-        end_date = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
-    except ValueError:
-        return jsonify({'error': 'Invalid date format'}), 400
-
-    conflicts = RoomSchedule.query.filter(
-        RoomSchedule.room_id == room_id,
-        RoomSchedule.tanggal_selesai > start_date,
-        RoomSchedule.tanggal_mulai < end_date
-    ).all()
-
-    is_available = len(conflicts) == 0
-    
+@app.route('/rooms/<int:room_id>', methods=['GET'])
+def get_room_detail(room_id):
+    room = Room.query.get_or_404(room_id)
     return jsonify({
-        'room_id': room_id,
-        'is_available': is_available,
-        'conflicting_schedules': [{
-            'schedule_id': c.schedule_id,
-            'tanggal_mulai': c.tanggal_mulai.strftime('%Y-%m-%d %H:%M:%S'),
-            'tanggal_selesai': c.tanggal_selesai.strftime('%Y-%m-%d %H:%M:%S')
-        } for c in conflicts]
+        'room_id': room.room_id,
+        'nama_ruangan': room.nama_ruangan,
+        'kapasitas': room.kapasitas,
+        'fasilitas': room.fasilitas,
+        'lokasi': room.lokasi
     })
 
-# GraphQL schema
+@app.route('/locations', methods=['GET'])
+def get_locations():
+    locations = db.session.query(Room.lokasi).distinct().all()
+    return jsonify([loc[0] for loc in locations if loc[0]])
 
-class RoomType(graphene.ObjectType):
+@app.route('/check-availability', methods=['GET'])
+def check_availability():
+    try:
+        room_id = request.args.get('room_id', type=int)
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+
+        if not all([room_id, start_date, end_date]):
+            return jsonify({'error': 'Missing required parameters'}), 400
+
+        # For now, we'll just check if the room exists
+        # In a real implementation, you would check against a schedule/booking database
+        room = Room.query.get(room_id)
+        if not room:
+            return jsonify({'error': 'Room not found'}), 404
+
+        # Mock response - in a real implementation, you would check actual availability
+        return jsonify({
+            'is_available': True,
+            'room_id': room_id,
+            'start_date': start_date,
+            'end_date': end_date
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'healthy'}), 200
+
+# ====================
+# GraphQL
+# ====================
+class RoomType(ObjectType):
     room_id = Int()
     nama_ruangan = String()
     kapasitas = Int()
     fasilitas = String()
     lokasi = String()
 
+# ----- CREATE -----
 class CreateRoom(Mutation):
     class Arguments:
         nama_ruangan = String(required=True)
@@ -103,15 +132,60 @@ class CreateRoom(Mutation):
         db.session.commit()
         return CreateRoom(room=room)
 
+# ----- UPDATE -----
+class UpdateRoom(Mutation):
+    class Arguments:
+        room_id = Int(required=True)
+        nama_ruangan = String()
+        kapasitas = Int()
+        fasilitas = String()
+        lokasi = String()
+
+    room = Field(lambda: RoomType)
+
+    def mutate(self, info, room_id, nama_ruangan=None, kapasitas=None, fasilitas=None, lokasi=None):
+        room = Room.query.get(room_id)
+        if not room:
+            raise Exception("Room not found")
+
+        if nama_ruangan is not None:
+            room.nama_ruangan = nama_ruangan
+        if kapasitas is not None:
+            room.kapasitas = kapasitas
+        if fasilitas is not None:
+            room.fasilitas = fasilitas
+        if lokasi is not None:
+            room.lokasi = lokasi
+
+        db.session.commit()
+        return UpdateRoom(room=room)
+
+# ----- DELETE -----
+class DeleteRoom(Mutation):
+    class Arguments:
+        room_id = Int(required=True)
+
+    ok = String()
+
+    def mutate(self, info, room_id):
+        room = Room.query.get(room_id)
+        if not room:
+            raise Exception("Room not found")
+        db.session.delete(room)
+        db.session.commit()
+        return DeleteRoom(ok=f"Room ID {room_id} deleted")
+
+# GraphQL schema
 class Query(ObjectType):
-    hello = String(default_value="GraphQL Ready!")
     rooms = graphene.List(RoomType)
 
-    def resolve_rooms(root, info):
+    def resolve_rooms(self, info):
         return Room.query.all()
 
 class Mutation(ObjectType):
     create_room = CreateRoom.Field()
+    update_room = UpdateRoom.Field()
+    delete_room = DeleteRoom.Field()
 
 schema = graphene.Schema(query=Query, mutation=Mutation)
 
@@ -181,5 +255,8 @@ def graphql():
     status_code = 200 if not result.errors else 400
     return jsonify(response), status_code
 
+# ====================
+# Run Application
+# ====================
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)
